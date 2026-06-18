@@ -9,6 +9,28 @@ variable "domain" {
   type        = string
 }
 
+variable "skip_dns_setup" {
+  description = "When true, skips Route53 zone creation, ACM certificate creation, DNS validation records, and the Route53 alias record for the ALB. Use this when DNS and certificate management are handled externally. certificate_arn must be provided alongside this flag. The load_balancer_dns_name and load_balancer_zone_id outputs can then be used to configure DNS records outside this module."
+  type        = bool
+  default     = false
+}
+
+variable "certificate_arn" {
+  description = "ARN of an existing, externally managed ACM certificate. Required when skip_dns_setup is true."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.certificate_arn == null || can(regex("^arn:aws[^:]*:acm:", var.certificate_arn))
+    error_message = "certificate_arn must be a valid ACM certificate ARN."
+  }
+
+  validation {
+    condition     = !var.skip_dns_setup || var.certificate_arn != null
+    error_message = "certificate_arn must be provided when skip_dns_setup is true."
+  }
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for VPC"
   type        = string
@@ -57,7 +79,7 @@ variable "private_route_table_ids" {
 variable "kubernetes_version" {
   description = "Kubernetes version to use for the EKS cluster"
   type        = string
-  default     = "1.32"
+  default     = "1.35"
 }
 
 variable "use_encryption_key" {
@@ -93,7 +115,7 @@ variable "postgres_max_capacity" {
 variable "postgres_version" {
   description = "PostgreSQL engine version to use"
   type        = string
-  default     = "15.12"
+  default     = "15.15"
 }
 
 variable "cache_node_type" {
@@ -133,7 +155,13 @@ variable "use_single_nat_gateway" {
 variable "langfuse_helm_chart_version" {
   description = "Version of the Langfuse Helm chart to deploy"
   type        = string
-  default     = "1.5.14"
+  default     = "1.5.29"
+}
+
+variable "helm_release_timeout" {
+  description = "Seconds to wait for the Langfuse Helm release to become ready. Fargate + EFS cold starts and the 60s ClickHouse ZooKeeper initialization cycle require more time than Helm's default 300s."
+  type        = number
+  default     = 900
 }
 
 # Resource configuration variables

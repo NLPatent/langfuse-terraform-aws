@@ -122,6 +122,7 @@ langfuse:
       alb.ingress.kubernetes.io/target-type: 'ip'
       alb.ingress.kubernetes.io/ssl-redirect: '443'
       alb.ingress.kubernetes.io/inbound-cidrs: ${local.inbound_cidrs_csv}
+      alb.ingress.kubernetes.io/certificate-arn: ${local.certificate_arn}
     hosts:
     - host: ${var.domain}
       paths:
@@ -183,7 +184,7 @@ resource "random_bytes" "encryption_key" {
 resource "kubernetes_secret" "langfuse" {
   metadata {
     name      = "langfuse"
-    namespace = "langfuse"
+    namespace = kubernetes_namespace.langfuse.metadata[0].name
   }
 
   data = {
@@ -197,11 +198,14 @@ resource "kubernetes_secret" "langfuse" {
 }
 
 resource "helm_release" "langfuse" {
-  name       = "langfuse"
-  repository = "https://langfuse.github.io/langfuse-k8s"
-  version    = var.langfuse_helm_chart_version
-  chart      = "langfuse"
-  namespace  = kubernetes_namespace.langfuse.metadata[0].name
+  name      = "langfuse"
+  chart     = "https://github.com/langfuse/langfuse-k8s/releases/download/langfuse-${var.langfuse_helm_chart_version}/langfuse-${var.langfuse_helm_chart_version}.tgz"
+  namespace = kubernetes_namespace.langfuse.metadata[0].name
+
+  # Fargate + EFS cold-start overhead means the default 300s is not enough.
+  # ClickHouse tables need ~60s to initialize after ZooKeeper becomes ready,
+  # and the web pod may crash-restart once before ClickHouse is fully ready.
+  timeout = var.helm_release_timeout
 
   values = compact([
     local.langfuse_values,
