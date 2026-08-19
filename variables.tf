@@ -9,6 +9,12 @@ variable "domain" {
   type        = string
 }
 
+variable "additional_ingress_hosts" {
+  description = "Additional hostnames routed to the Langfuse web service. The configured certificate must cover these hostnames."
+  type        = list(string)
+  default     = []
+}
+
 variable "skip_dns_setup" {
   description = "When true, skips Route53 zone creation, ACM certificate creation, DNS validation records, and the Route53 alias record for the ALB. Use this when DNS and certificate management are handled externally. certificate_arn must be provided alongside this flag. The load_balancer_dns_name and load_balancer_zone_id outputs can then be used to configure DNS records outside this module."
   type        = bool

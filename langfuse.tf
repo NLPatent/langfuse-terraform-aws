@@ -124,10 +124,12 @@ langfuse:
       alb.ingress.kubernetes.io/inbound-cidrs: ${local.inbound_cidrs_csv}
       alb.ingress.kubernetes.io/certificate-arn: ${local.certificate_arn}
     hosts:
-    - host: ${var.domain}
+%{for host in concat([var.domain], var.additional_ingress_hosts)~}
+    - host: ${host}
       paths:
       - path: /
         pathType: Prefix
+%{endfor~}
 EOT
   encryption_values = var.use_encryption_key == false ? "" : <<EOT
 langfuse:
@@ -226,4 +228,3 @@ resource "helm_release" "langfuse" {
     helm_release.aws_load_balancer_controller
   ]
 }
-
