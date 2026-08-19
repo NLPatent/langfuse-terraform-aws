@@ -155,3 +155,6 @@ terragrunt-debug.tfvars.json
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/terraform,terragrunt,intellij+all,visualstudiocode
+
+# Local Git worktrees
+.worktrees/
