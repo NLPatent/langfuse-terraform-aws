@@ -48,6 +48,11 @@ module "langfuse" {
   # Optional: Activate additional log tables in ClickHouse. Will increase EFS costs, but may aid in debugging.
   enable_clickhouse_log_tables = false  # Set to true to have additional logs.
 
+  # Optional: Store additional sensitive values in the existing Langfuse Secret
+  additional_secret_data = {
+    "custom-api-key" = var.custom_api_key
+  }
+
   # Optional: Add additional environment variables
   additional_env = [
     # Direct value
@@ -57,11 +62,11 @@ module "langfuse" {
     },
     # Reference to Kubernetes secret
     {
-      name = "DATABASE_PASSWORD"
+      name = "CUSTOM_API_KEY"
       valueFrom = {
         secretKeyRef = {
-          name = "my-database-secret"
-          key  = "password"
+          name = "langfuse"
+          key  = "custom-api-key"
         }
       }
     }
