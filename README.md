@@ -60,7 +60,17 @@ module "langfuse" {
       name  = "CUSTOM_ENV_VAR"
       value = "custom-value"
     },
-    # Reference to Kubernetes secret
+    # Reference to an existing Kubernetes secret
+    {
+      name = "DATABASE_PASSWORD"
+      valueFrom = {
+        secretKeyRef = {
+          name = "my-database-secret"
+          key  = "password"
+        }
+      }
+    },
+    # Reference to sensitive data added to the Langfuse secret above
     {
       name = "CUSTOM_API_KEY"
       valueFrom = {
