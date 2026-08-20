@@ -189,14 +189,14 @@ resource "kubernetes_secret" "langfuse" {
     namespace = kubernetes_namespace.langfuse.metadata[0].name
   }
 
-  data = {
+  data = merge(var.additional_secret_data, {
     "redis-password"      = random_password.redis_password.result
     "postgres-password"   = random_password.postgres_password.result
     "salt"                = random_bytes.salt.base64
     "nextauth-secret"     = random_bytes.nextauth_secret.base64
     "clickhouse-password" = random_password.clickhouse_password.result
     "encryption_key"      = var.use_encryption_key ? random_bytes.encryption_key[0].hex : ""
-  }
+  })
 }
 
 resource "helm_release" "langfuse" {

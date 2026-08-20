@@ -288,3 +288,25 @@ variable "additional_env" {
     error_message = "Each environment variable must have either 'value' or 'valueFrom' specified, but not both."
   }
 }
+
+variable "additional_secret_data" {
+  description = "Additional sensitive key/value pairs to store in the Langfuse Kubernetes Secret"
+  type        = map(string)
+  default     = {}
+  sensitive   = true
+
+  validation {
+    condition = length(setintersection(
+      toset(keys(var.additional_secret_data)),
+      toset([
+        "redis-password",
+        "postgres-password",
+        "salt",
+        "nextauth-secret",
+        "clickhouse-password",
+        "encryption_key",
+      ])
+    )) == 0
+    error_message = "additional_secret_data cannot replace keys managed internally by this module."
+  }
+}
