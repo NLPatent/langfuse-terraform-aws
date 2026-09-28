@@ -58,7 +58,7 @@ data "aws_lb" "ingress" {
 
   depends_on = [
     helm_release.aws_load_balancer_controller,
-    helm_release.langfuse
+    kubernetes_ingress_v1.langfuse
   ]
 }
 

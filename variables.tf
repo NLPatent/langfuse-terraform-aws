@@ -149,6 +149,8 @@ variable "fargate_profile_namespaces" {
     "default",
     "langfuse",
     "kube-system",
+    "cert-manager",
+    "clickhouse-operator",
   ]
 }
 
@@ -159,9 +161,15 @@ variable "use_single_nat_gateway" {
 }
 
 variable "langfuse_helm_chart_version" {
-  description = "Version of the Langfuse Helm chart to deploy"
+  description = "Version of the Langfuse Helm chart to deploy. Chart 2.x runs Langfuse v4."
   type        = string
-  default     = "1.5.29"
+  default     = "2.1.2"
+}
+
+variable "langfuse_image_tag" {
+  description = "Langfuse application image tag. Chart 2.1.2 defaults to 4.38.0."
+  type        = string
+  default     = "4.38.0"
 }
 
 variable "helm_release_timeout" {

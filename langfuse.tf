@@ -1,8 +1,6 @@
 locals {
   inbound_cidrs_csv = join(",", var.ingress_inbound_cidrs)
   langfuse_values   = <<EOT
-global:
-  defaultStorageClass: efs
 langfuse:
   salt:
     secretKeyRef:
@@ -17,6 +15,8 @@ langfuse:
   serviceAccount:
     annotations:
       eks.amazonaws.com/role-arn: ${aws_iam_role.langfuse_irsa.arn}
+  image:
+    tag: "${var.langfuse_image_tag}"
   # Resource configuration for production workloads
   resources:
     limits:
@@ -44,21 +44,21 @@ postgresql:
     secretKeys:
       userPasswordKey: postgres-password
 clickhouse:
-  auth:
-    existingSecret: langfuse
-    existingSecretKey: clickhouse-password
-  replicaCount: ${var.clickhouse_replicas}
-  # Resource configuration for ClickHouse containers
-  resources:
-    limits:
-      cpu: "${var.clickhouse_cpu}"
-      memory: "${var.clickhouse_memory}"
-    requests:
-      cpu: "${var.clickhouse_cpu}"
-      memory: "${var.clickhouse_memory}"
-  # Resource configuration for ClickHouse Keeper
-  zookeeper:
-    replicaCount: ${var.clickhouse_replicas}
+  deploy: true
+  cluster:
+    replicas: ${var.clickhouse_replicas}
+    resources:
+      limits:
+        cpu: "${var.clickhouse_cpu}"
+        memory: "${var.clickhouse_memory}"
+      requests:
+        cpu: "${var.clickhouse_cpu}"
+        memory: "${var.clickhouse_memory}"
+    storage:
+      className: ${kubernetes_storage_class.efs_langfuse.metadata[0].name}
+      size: 100Gi
+  keeper:
+    replicas: ${var.clickhouse_replicas}
     resources:
       limits:
         cpu: "${var.clickhouse_keeper_cpu}"
@@ -66,6 +66,9 @@ clickhouse:
       requests:
         cpu: "${var.clickhouse_keeper_cpu}"
         memory: "${var.clickhouse_keeper_memory}"
+    storage:
+      className: ${kubernetes_storage_class.efs_langfuse.metadata[0].name}
+      size: 20Gi
 redis:
   deploy: false
   host: ${aws_elasticache_replication_group.redis.primary_endpoint_address}
@@ -114,7 +117,10 @@ EOT
   ingress_values    = <<EOT
 langfuse:
   ingress:
-    enabled: true
+    # The existing ALB ingress is owned by kubernetes_ingress_v1.langfuse.
+    # Chart 2 must not create a second ingress: this cluster has no ALB group,
+    # so a new ingress would create a new load balancer and break DNS.
+    enabled: false
     className: alb
     annotations:
       alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}, {"HTTPS":443}]'
@@ -147,18 +153,6 @@ EOT
   # <asynchronous_insert_log remove="1"/>
   # <query_metric_log remove="1"/>
   # <error_log remove="1"/>
-  clickhouse_overwrite_values = var.enable_clickhouse_log_tables ? "" : <<EOT
-clickhouse:
-  extraOverrides: |
-      <clickhouse>
-        <trace_log remove="1"/>
-        <text_log remove="1"/>
-        <opentelemetry_span_log remove="1"/>
-        <asynchronous_metric_log remove="1"/>
-        <metric_log remove="1"/>
-        <latency_log remove="1"/>
-      </clickhouse>
-EOT
 }
 
 resource "kubernetes_namespace" "langfuse" {
@@ -199,14 +193,23 @@ resource "kubernetes_secret" "langfuse" {
   })
 }
 
-resource "helm_release" "langfuse" {
-  name      = "langfuse"
-  chart     = "https://github.com/langfuse/langfuse-k8s/releases/download/langfuse-${var.langfuse_helm_chart_version}/langfuse-${var.langfuse_helm_chart_version}.tgz"
-  namespace = kubernetes_namespace.langfuse.metadata[0].name
+# The chart 1.x release stays in the cluster so its ClickHouse and ZooKeeper
+# remain available. Drop it from state without uninstalling it.
+removed {
+  from = helm_release.langfuse
 
-  # Fargate + EFS cold-start overhead means the default 300s is not enough.
-  # ClickHouse tables need ~60s to initialize after ZooKeeper becomes ready,
-  # and the web pod may crash-restart once before ClickHouse is fully ready.
+  lifecycle {
+    destroy = false
+  }
+}
+
+resource "helm_release" "langfuse_v2" {
+  name       = "langfuse-v2"
+  namespace  = kubernetes_namespace.langfuse.metadata[0].name
+  repository = "oci://ghcr.io/langfuse/langfuse-k8s/charts"
+  chart      = "langfuse"
+  version    = var.langfuse_helm_chart_version
+
   timeout = var.helm_release_timeout
 
   values = compact([
@@ -214,7 +217,6 @@ resource "helm_release" "langfuse" {
     local.ingress_values,
     local.encryption_values,
     local.additional_env_values,
-    local.clickhouse_overwrite_values,
   ])
 
   depends_on = [
@@ -222,9 +224,51 @@ resource "helm_release" "langfuse" {
     aws_iam_role.langfuse_irsa,
     aws_iam_role_policy.langfuse_s3_access,
     aws_eks_fargate_profile.namespaces,
-    kubernetes_persistent_volume.clickhouse_data,
-    kubernetes_persistent_volume.clickhouse_zookeeper,
+    kubernetes_storage_class.efs_langfuse,
+    helm_release.clickhouse_operator,
     kubernetes_service_account.aws_load_balancer_controller,
     helm_release.aws_load_balancer_controller
   ]
+}
+
+resource "kubernetes_ingress_v1" "langfuse" {
+  metadata {
+    name      = "langfuse"
+    namespace = kubernetes_namespace.langfuse.metadata[0].name
+    annotations = {
+      "alb.ingress.kubernetes.io/listen-ports"    = "[{\"HTTP\":80}, {\"HTTPS\":443}]"
+      "alb.ingress.kubernetes.io/scheme"          = var.alb_scheme
+      "alb.ingress.kubernetes.io/target-type"     = "ip"
+      "alb.ingress.kubernetes.io/ssl-redirect"    = "443"
+      "alb.ingress.kubernetes.io/inbound-cidrs"   = local.inbound_cidrs_csv
+      "alb.ingress.kubernetes.io/certificate-arn" = local.certificate_arn
+    }
+  }
+
+  spec {
+    ingress_class_name = "alb"
+
+    dynamic "rule" {
+      for_each = concat([var.domain], var.additional_ingress_hosts)
+      content {
+        host = rule.value
+        http {
+          path {
+            path      = "/"
+            path_type = "Prefix"
+            backend {
+              service {
+                name = "${helm_release.langfuse_v2.name}-web"
+                port {
+                  name = "http"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  depends_on = [helm_release.langfuse_v2]
 }
