@@ -45,6 +45,12 @@ postgresql:
       userPasswordKey: postgres-password
 clickhouse:
   deploy: true
+  # Use the password chart 2 already created. Do not point this at the chart 1
+  # secret: that password is different, and leaving this empty lets an upgrade
+  # generate a new one.
+  auth:
+    existingSecret: langfuse-v2-clickhouse-auth
+    existingSecretKey: password
   cluster:
     replicas: ${var.clickhouse_replicas}
     resources:
