@@ -16,9 +16,9 @@ resource "aws_eks_cluster" "langfuse" {
 
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
-  tags = {
+  tags = merge(local.cost_tags, {
     Name = local.tag_name
-  }
+  })
 
   depends_on = [
     aws_iam_role_policy_attachment.eks_cluster_policy,
@@ -35,6 +35,12 @@ resource "aws_iam_openid_connect_provider" "eks" {
 
   tags = {
     Name = local.tag_name
+  }
+
+  # Keep the thumbprint already on the provider. Recomputing it from the
+  # certificate makes the plan rotate IRSA whenever the cluster is touched.
+  lifecycle {
+    ignore_changes = [thumbprint_list]
   }
 }
 
@@ -83,9 +89,9 @@ resource "aws_eks_fargate_profile" "namespaces" {
     namespace = each.value
   }
 
-  tags = {
+  tags = merge(local.cost_tags, {
     Name = local.tag_name
-  }
+  })
 }
 
 resource "aws_security_group" "eks" {
@@ -150,6 +156,8 @@ resource "aws_iam_role_policy_attachment" "eks_service_policy" {
 resource "aws_cloudwatch_log_group" "eks" {
   name              = "/aws/eks/${var.name}/cluster"
   retention_in_days = 30
+
+  tags = local.cost_tags
 }
 
 # EKS deploys CoreDNS expecting EC2 nodes. On Fargate-only clusters the pods

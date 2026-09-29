@@ -35,6 +35,8 @@ resource "aws_elasticache_parameter_group" "redis" {
 resource "aws_cloudwatch_log_group" "redis" {
   name              = "/redis/${var.name}"
   retention_in_days = 7
+
+  tags = local.cost_tags
 }
 
 resource "aws_elasticache_subnet_group" "redis" {
@@ -76,7 +78,7 @@ resource "aws_elasticache_replication_group" "redis" {
     log_type         = "slow-log"
   }
 
-  tags = {
+  tags = merge(local.cost_tags, {
     Name = local.tag_name
-  }
+  })
 }
