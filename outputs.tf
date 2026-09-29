@@ -54,3 +54,8 @@ output "bucket_id" {
   description = "ID of the S3 bucket for Langfuse"
   value       = aws_s3_bucket.langfuse.id
 }
+
+output "efs_file_system_id" {
+  description = "EFS file system used by Langfuse ClickHouse"
+  value       = aws_efs_file_system.langfuse.id
+}

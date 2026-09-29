@@ -4,9 +4,9 @@ resource "aws_efs_file_system" "langfuse" {
   encrypted       = true
   throughput_mode = "elastic"
 
-  tags = {
+  tags = merge(local.cost_tags, {
     Name = local.tag_name
-  }
+  })
 }
 
 # Mount targets in each private subnet
@@ -123,4 +123,27 @@ resource "kubernetes_storage_class" "efs" {
     name = "efs"
   }
   storage_provisioner = "efs.csi.aws.com"
+}
+
+# Chart 2 ClickHouse pods mount this class. The live volumes are static PVs
+# bound to access points under /langfuse-v2; this class records the same
+# filesystem and POSIX owner the ClickHouse image expects (uid/gid 101).
+resource "kubernetes_storage_class" "efs_langfuse" {
+  metadata {
+    name = "efs-langfuse"
+  }
+
+  storage_provisioner    = "efs.csi.aws.com"
+  reclaim_policy         = "Retain"
+  volume_binding_mode    = "Immediate"
+  allow_volume_expansion = true
+
+  parameters = {
+    provisioningMode = "efs-ap"
+    fileSystemId     = aws_efs_file_system.langfuse.id
+    directoryPerms   = "700"
+    basePath         = "/langfuse-v2"
+    uid              = "101"
+    gid              = "101"
+  }
 }
