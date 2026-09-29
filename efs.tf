@@ -4,9 +4,9 @@ resource "aws_efs_file_system" "langfuse" {
   encrypted       = true
   throughput_mode = "elastic"
 
-  tags = {
+  tags = merge(local.cost_tags, {
     Name = local.tag_name
-  }
+  })
 }
 
 # Mount targets in each private subnet

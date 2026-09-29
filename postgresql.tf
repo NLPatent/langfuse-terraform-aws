@@ -63,9 +63,11 @@ resource "aws_rds_cluster" "postgres" {
     max_capacity = var.postgres_max_capacity
   }
 
-  tags = {
+  copy_tags_to_snapshot = true
+
+  tags = merge(local.cost_tags, {
     Name = local.tag_name
-  }
+  })
 }
 
 resource "aws_rds_cluster_parameter_group" "postgres" {
@@ -75,10 +77,10 @@ resource "aws_rds_cluster_parameter_group" "postgres" {
 }
 
 resource "aws_rds_cluster_instance" "postgres" {
-  count              = var.postgres_instance_count
-  identifier         = "${var.name}-postgres-${count.index + 1}"
-  cluster_identifier = aws_rds_cluster.postgres.id
-  instance_class     = "db.serverless"
+  count               = var.postgres_instance_count
+  identifier          = "${var.name}-postgres-${count.index + 1}"
+  cluster_identifier  = aws_rds_cluster.postgres.id
+  instance_class      = "db.serverless"
   engine              = aws_rds_cluster.postgres.engine
   engine_version      = aws_rds_cluster.postgres.engine_version
   publicly_accessible = false
@@ -87,7 +89,7 @@ resource "aws_rds_cluster_instance" "postgres" {
   performance_insights_enabled          = true
   performance_insights_retention_period = 7
 
-  tags = {
+  tags = merge(local.cost_tags, {
     Name = "${local.tag_name} ${count.index + 1}"
-  }
+  })
 }
