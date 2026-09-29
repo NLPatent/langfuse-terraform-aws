@@ -123,6 +123,7 @@ langfuse:
       alb.ingress.kubernetes.io/ssl-redirect: '443'
       alb.ingress.kubernetes.io/inbound-cidrs: ${local.inbound_cidrs_csv}
       alb.ingress.kubernetes.io/certificate-arn: ${local.certificate_arn}
+      alb.ingress.kubernetes.io/tags: Service=${local.cost_tags.Service}
     hosts:
 %{for host in concat([var.domain], var.additional_ingress_hosts)~}
     - host: ${host}

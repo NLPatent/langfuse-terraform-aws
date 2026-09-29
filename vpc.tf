@@ -101,9 +101,9 @@ resource "aws_vpc_endpoint" "sts" {
 
   private_dns_enabled = true
 
-  tags = {
+  tags = merge(local.cost_tags, {
     Name = "${local.tag_name} STS VPC Endpoint"
-  }
+  })
 }
 
 resource "aws_vpc_endpoint" "s3" {
@@ -114,9 +114,9 @@ resource "aws_vpc_endpoint" "s3" {
   vpc_endpoint_type = "Gateway"
   route_table_ids   = local.private_route_table_ids
 
-  tags = {
+  tags = merge(local.cost_tags, {
     Name = "${local.tag_name} S3 VPC Endpoint"
-  }
+  })
 }
 
 # Security group for VPC endpoints
