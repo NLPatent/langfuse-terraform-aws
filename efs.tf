@@ -133,9 +133,10 @@ resource "kubernetes_storage_class" "efs_langfuse" {
     name = "efs-langfuse"
   }
 
-  storage_provisioner = "efs.csi.aws.com"
-  reclaim_policy      = "Retain"
-  volume_binding_mode = "Immediate"
+  storage_provisioner    = "efs.csi.aws.com"
+  reclaim_policy         = "Retain"
+  volume_binding_mode    = "Immediate"
+  allow_volume_expansion = true
 
   parameters = {
     provisioningMode = "efs-ap"
