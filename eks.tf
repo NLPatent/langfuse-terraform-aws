@@ -7,6 +7,13 @@ resource "aws_eks_cluster" "langfuse" {
   role_arn = aws_iam_role.eks.arn
   version  = var.kubernetes_version
 
+  # Standard support ends with an automatic control plane upgrade.
+  # Extended support keeps the current version and bills a higher rate.
+  # https://docs.aws.amazon.com/eks/latest/userguide/disable-extended-support.html
+  upgrade_policy {
+    support_type = "STANDARD"
+  }
+
   vpc_config {
     subnet_ids              = local.private_subnets
     endpoint_private_access = true
