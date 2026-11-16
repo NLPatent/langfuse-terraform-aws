@@ -257,6 +257,21 @@ variable "ingress_inbound_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "metabase_clickhouse_client_cidrs" {
+  description = "CIDRs allowed to reach ClickHouse HTTP (8123) through an internal load balancer. Empty disables the load balancer. The default is the production-us Metabase private subnets, where that ECS service runs. Langfuse and this Metabase are both in us-east-1, and the peering return route for 10.0.0.0/16 is already in place."
+  type        = list(string)
+  default = [
+    "10.0.0.0/20",
+    "10.0.32.0/20",
+    "10.0.64.0/20",
+  ]
+
+  validation {
+    condition     = alltrue([for cidr in var.metabase_clickhouse_client_cidrs : can(cidrhost(cidr, 0))])
+    error_message = "metabase_clickhouse_client_cidrs must be a list of CIDR blocks."
+  }
+}
+
 variable "redis_at_rest_encryption" {
   description = "Whether at-rest encryption is enabled for the Redis cluster"
   type        = bool

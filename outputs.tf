@@ -59,3 +59,11 @@ output "efs_file_system_id" {
   description = "EFS file system used by Langfuse ClickHouse"
   value       = aws_efs_file_system.langfuse.id
 }
+
+output "clickhouse_metabase_hostname" {
+  description = "Internal load balancer hostname for ClickHouse HTTP (port 8123). Null when metabase_clickhouse_client_cidrs is empty."
+  value = length(kubernetes_service.clickhouse_metabase) == 0 ? null : try(
+    kubernetes_service.clickhouse_metabase[0].status[0].load_balancer[0].ingress[0].hostname,
+    null
+  )
+}
