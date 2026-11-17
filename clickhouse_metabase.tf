@@ -60,6 +60,10 @@ resource "kubernetes_service" "clickhouse_metabase" {
 
   spec {
     type = "LoadBalancer"
+    # The controller webhook sets this class, and Kubernetes will not change it
+    # afterwards. Declare the same value so Terraform does not replace the Service.
+    # https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.7/guide/service/nlb/
+    load_balancer_class = "service.k8s.aws/nlb"
     selector = {
       app = "${helm_release.langfuse_v2.name}-clickhouse"
     }
